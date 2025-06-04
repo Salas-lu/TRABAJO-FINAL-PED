@@ -1,0 +1,204 @@
+#include <iostream>
+#include <string>
+#include <ctime>
+#include <vector>
+
+using namespace std;
+
+class CasoMedico {
+public:
+    int id;
+    string descripcion;
+    int urgencia;
+    time_t fecha;
+    
+    CasoMedico(int i, string d, int u) : id(i), descripcion(d), urgencia(u) {
+        fecha = time(nullptr);
+    }
+};
+
+class NodoAVL {
+public:
+    CasoMedico* caso;
+    NodoAVL* izquierda;
+    NodoAVL* derecha;
+    int altura;
+    
+    NodoAVL(CasoMedico* c) : caso(c), izquierda(nullptr), derecha(nullptr), altura(1) {}
+};
+
+class TablaHash {
+    static const int TAMANO = 1000;
+    vector<CasoMedico*> tabla[TAMANO];
+    
+public:
+    int funcionHash(int id) {
+        return id % TAMANO;
+    }
+    
+    void insertar(CasoMedico* caso) {
+        int indice = funcionHash(caso->id);
+        tabla[indice].push_back(caso);
+    }
+    
+    CasoMedico* buscar(int id) {
+        int indice = funcionHash(id);
+        for(auto& caso : tabla[indice]) {
+            if(caso->id == id) return caso;
+        }
+        return nullptr;
+    }
+};
+
+class AVLManager {
+    NodoAVL* raiz;
+    
+    int altura(NodoAVL* n) {
+        return n ? n->altura : 0;
+    }
+    
+    NodoAVL* rotarDerecha(NodoAVL* y) {
+        NodoAVL* x = y->izquierda;
+        NodoAVL* T2 = x->derecha;
+        
+        x->derecha = y;
+        y->izquierda = T2;
+        
+        y->altura = max(altura(y->izquierda), altura(y->derecha)) + 1;
+        x->altura = max(altura(x->izquierda), altura(x->derecha)) + 1;
+        
+        return x;
+    }
+    
+    NodoAVL* rotarIzquierda(NodoAVL* x) {
+        NodoAVL* y = x->derecha;
+        NodoAVL* T2 = y->izquierda;
+        
+        y->izquierda = x;
+        x->derecha = T2;
+        
+        x->altura = max(altura(x->izquierda), altura(x->derecha)) + 1;
+        y->altura = max(altura(y->izquierda), altura(y->derecha)) + 1;
+        
+        return y;
+    }
+    
+    int balanceFactor(NodoAVL* n) {
+        return n ? altura(n->izquierda) - altura(n->derecha) : 0;
+    }
+    
+    NodoAVL* insertar(NodoAVL* nodo, CasoMedico* caso) {
+        if(!nodo) return new NodoAVL(caso);
+        
+        if(caso->fecha < nodo->caso->fecha)
+            nodo->izquierda = insertar(nodo->izquierda, caso);
+        else
+            nodo->derecha = insertar(nodo->derecha, caso);
+            
+        nodo->altura = 1 + max(altura(nodo->izquierda), altura(nodo->derecha));
+        
+        int balance = balanceFactor(nodo);
+        
+        if(balance > 1 && caso->fecha < nodo->izquierda->caso->fecha)
+            return rotarDerecha(nodo);
+            
+        if(balance < -1 && caso->fecha > nodo->derecha->caso->fecha)
+            return rotarIzquierda(nodo);
+            
+        if(balance > 1 && caso->fecha > nodo->izquierda->caso->fecha) {
+            nodo->izquierda = rotarIzquierda(nodo->izquierda);
+            return rotarDerecha(nodo);
+        }
+        
+        if(balance < -1 && caso->fecha < nodo->derecha->caso->fecha) {
+            nodo->derecha = rotarDerecha(nodo->derecha);
+            return rotarIzquierda(nodo);
+        }
+        
+        return nodo;
+    }
+    
+public:
+    AVLManager() : raiz(nullptr) {}
+    
+    void insertarCaso(CasoMedico* caso) {
+        raiz = insertar(raiz, caso);
+    }
+    
+    vector<CasoMedico*> filtrarPorUrgencia(int nivel) {
+        vector<CasoMedico*> resultados;
+        return resultados;
+    }
+    
+    CasoMedico* buscarPorFecha(time_t fecha) {
+        return nullptr;
+    }
+};
+
+class SistemaGestion {
+    TablaHash tablaHash;
+    AVLManager avlManager;
+    int contadorID = 1;
+    
+public:
+    void agregarCaso() {
+        string desc;
+        int urgencia;
+        
+        cout << "Descripcion: ";
+        cin.ignore();
+        getline(cin, desc);
+        
+        cout << "Nivel de urgencia (1-5): ";
+        cin >> urgencia;
+        
+        CasoMedico* nuevo = new CasoMedico(contadorID++, desc, urgencia);
+        tablaHash.insertar(nuevo);
+        avlManager.insertarCaso(nuevo);
+    }
+    
+    void buscarPorID() {
+        int id;
+        cout << "ID a buscar: ";
+        cin >> id;
+        
+        CasoMedico* caso = tablaHash.buscar(id);
+        if(caso) {
+            cout << "Caso encontrado:" << endl;
+            cout << "Fecha: " << ctime(&caso->fecha);
+            cout << "Urgencia: " << caso->urgencia << endl;
+            cout << "Descripcion: " << caso->descripcion << endl;
+        } else {
+            cout << "Caso no encontrado" << endl;
+        }
+    }
+    
+    void menu() {
+        while(true) {
+            cout << "Sistema de Gestion Medica" << endl;
+            cout << "1. Agregar caso" << endl;
+            cout << "2. Buscar por ID" << endl;
+            cout << "3. Buscar por fecha" << endl;
+            cout << "4. Filtrar por urgencia" << endl;
+            cout << "5. Salir" << endl;
+            cout << "Opcion: ";
+            
+            int opcion;
+            cin >> opcion;
+            
+            switch(opcion) {
+                case 1: agregarCaso(); break;
+                case 2: buscarPorID(); break;
+                // Implementar otras opciones
+                case 5: return;
+                default: cout << "Opcion invalida" << endl;
+            }
+        }
+    }
+};
+
+int main() {
+    SistemaGestion sistema;
+    sistema.menu();
+    return 0;
+}
