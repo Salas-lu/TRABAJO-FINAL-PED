@@ -1,9 +1,15 @@
+#include <windows.h>
+#include <gdiplus.h>
 #include <iostream>
 #include <string>
 #include <ctime>
-#include <vector>
 
+#pragma comment(lib, "Gdiplus.lib")
+
+using namespace Gdiplus;
 using namespace std;
+
+// --- Clases del sistema de gestión médica ---
 
 class CasoMedico {
 public:
@@ -29,22 +35,35 @@ public:
 
 class TablaHash {
     static const int TAMANO = 1000;
-    vector<CasoMedico*> tabla[TAMANO];
+    struct NodoLista {
+        CasoMedico* caso;
+        NodoLista* siguiente;
+        NodoLista(CasoMedico* c) : caso(c), siguiente(nullptr) {}
+    };
+    NodoLista* tabla[TAMANO];
 
 public:
+    TablaHash() {
+        for (int i = 0; i < TAMANO; i++) tabla[i] = nullptr;
+    }
+
     int funcionHash(int id) {
         return id % TAMANO;
     }
 
     void insertar(CasoMedico* caso) {
         int indice = funcionHash(caso->id);
-        tabla[indice].push_back(caso);
+        NodoLista* nuevo = new NodoLista(caso);
+        nuevo->siguiente = tabla[indice];
+        tabla[indice] = nuevo;
     }
 
     CasoMedico* buscar(int id) {
         int indice = funcionHash(id);
-        for(auto& caso : tabla[indice]) {
-            if(caso->id == id) return caso;
+        NodoLista* actual = tabla[indice];
+        while (actual) {
+            if (actual->caso->id == id) return actual->caso;
+            actual = actual->siguiente;
         }
         return nullptr;
     }
@@ -88,9 +107,9 @@ class AVLManager {
     }
 
     NodoAVL* insertar(NodoAVL* nodo, CasoMedico* caso) {
-        if(!nodo) return new NodoAVL(caso);
+        if (!nodo) return new NodoAVL(caso);
 
-        if(caso->fecha < nodo->caso->fecha)
+        if (caso->fecha < nodo->caso->fecha)
             nodo->izquierda = insertar(nodo->izquierda, caso);
         else
             nodo->derecha = insertar(nodo->derecha, caso);
@@ -99,18 +118,18 @@ class AVLManager {
 
         int balance = balanceFactor(nodo);
 
-        if(balance > 1 && caso->fecha < nodo->izquierda->caso->fecha)
+        if (balance > 1 && caso->fecha < nodo->izquierda->caso->fecha)
             return rotarDerecha(nodo);
 
-        if(balance < -1 && caso->fecha > nodo->derecha->caso->fecha)
+        if (balance < -1 && caso->fecha > nodo->derecha->caso->fecha)
             return rotarIzquierda(nodo);
 
-        if(balance > 1 && caso->fecha > nodo->izquierda->caso->fecha) {
+        if (balance > 1 && caso->fecha > nodo->izquierda->caso->fecha) {
             nodo->izquierda = rotarIzquierda(nodo->izquierda);
             return rotarDerecha(nodo);
         }
 
-        if(balance < -1 && caso->fecha < nodo->derecha->caso->fecha) {
+        if (balance < -1 && caso->fecha < nodo->derecha->caso->fecha) {
             nodo->derecha = rotarDerecha(nodo->derecha);
             return rotarIzquierda(nodo);
         }
@@ -124,16 +143,92 @@ public:
     void insertarCaso(CasoMedico* caso) {
         raiz = insertar(raiz, caso);
     }
-
-    vector<CasoMedico*> filtrarPorUrgencia(int nivel) {
-        vector<CasoMedico*> resultados;
-        return resultados;
-    }
-
-    CasoMedico* buscarPorFecha(time_t fecha) {
-        return nullptr;
-    }
 };
+
+// --- Variables globales para la ventana ---
+
+HWND hwndMain = nullptr;
+ULONG_PTR gdiplusToken;
+Bitmap* imagen = nullptr;
+
+// --- Prototipos ---
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// --- Funciones para inicializar y mostrar la ventana ---
+
+bool InicializarGDIPlus() {
+    GdiplusStartupInput gdiplusStartupInput;
+    return GdiplusStartup(&gdiplusToken, &gdiplusStartupInput, NULL) == Ok;
+}
+
+void FinalizarGDIPlus() {
+    if (imagen) {
+        delete imagen;
+        imagen = nullptr;
+    }
+    GdiplusShutdown(gdiplusToken);
+}
+
+bool CargarImagen(const wchar_t* ruta) {
+    imagen = Bitmap::FromFile(ruta);
+    return imagen && imagen->GetLastStatus() == Ok;
+}
+
+int CrearVentana(HINSTANCE hInstance, int nCmdShow) {
+    WNDCLASS wc = { 0 };
+    wc.lpfnWndProc = WndProc;
+    wc.hInstance = hInstance;
+    wc.lpszClassName = L"MiVentanaImagen";
+    wc.hbrBackground = (HBRUSH)(COLOR_WINDOW + 1);
+    wc.hCursor = LoadCursor(NULL, IDC_ARROW);
+
+    if (!RegisterClass(&wc)) {
+        MessageBox(NULL, L"No se pudo registrar la clase de ventana", L"Error", MB_ICONERROR);
+        return 0;
+    }
+
+    hwndMain = CreateWindow(wc.lpszClassName, L"Sistema de Gestion Medica - Imagen",
+        WS_OVERLAPPEDWINDOW, CW_USEDEFAULT, CW_USEDEFAULT, 600, 400,
+        NULL, NULL, hInstance, NULL);
+
+    if (!hwndMain) {
+        MessageBox(NULL, L"No se pudo crear la ventana", L"Error", MB_ICONERROR);
+        return 0;
+    }
+
+    ShowWindow(hwndMain, nCmdShow);
+    UpdateWindow(hwndMain);
+
+    return 1;
+}
+
+// --- Procedimiento de ventana ---
+
+LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) {
+    switch (msg) {
+    case WM_PAINT: {
+        PAINTSTRUCT ps;
+        HDC hdc = BeginPaint(hwnd, &ps);
+        if (imagen) {
+            Graphics graphics(hdc);
+            // Dibuja la imagen en la esquina superior izquierda
+            graphics.DrawImage(imagen, 10, 10, imagen->GetWidth(), imagen->GetHeight());
+        }
+        EndPaint(hwnd, &ps);
+    } break;
+
+    case WM_DESTROY:
+        PostQuitMessage(0);
+        break;
+
+    default:
+        return DefWindowProc(hwnd, msg, wParam, lParam);
+    }
+    return 0;
+}
+
+// --- Sistema de gestión médica ---
 
 class SistemaGestion {
     TablaHash tablaHash;
@@ -163,42 +258,73 @@ public:
         cin >> id;
 
         CasoMedico* caso = tablaHash.buscar(id);
-        if(caso) {
+        if (caso) {
             cout << "Caso encontrado:" << endl;
             cout << "Fecha: " << ctime(&caso->fecha);
             cout << "Urgencia: " << caso->urgencia << endl;
             cout << "Descripcion: " << caso->descripcion << endl;
-        } else {
+        }
+        else {
             cout << "Caso no encontrado" << endl;
         }
     }
 
     void menu() {
-        while(true) {
-            cout << "Sistema de Gestion Medica" << endl;
-            cout << "1. Agregar caso" << endl;
-            cout << "2. Buscar por ID" << endl;
-            cout << "3. Buscar por fecha" << endl;
-            cout << "4. Filtrar por urgencia" << endl;
-            cout << "5. Salir" << endl;
+        while (true) {
+            cout << "\nSistema de Gestion Medica\n";
+            cout << "1. Agregar caso\n";
+            cout << "2. Buscar por ID\n";
+            cout << "3. Salir\n";
             cout << "Opcion: ";
 
             int opcion;
             cin >> opcion;
 
-            switch(opcion) {
-                case 1: agregarCaso(); break;
-                case 2: buscarPorID(); break;
-                // Implementar otras opciones
-                case 5: return;
-                default: cout << "Opcion invalida" << endl;
+            switch (opcion) {
+            case 1: agregarCaso(); break;
+            case 2: buscarPorID(); break;
+            case 3: return;
+            default: cout << "Opcion invalida\n"; break;
             }
         }
     }
 };
 
-int main() {
+// --- Función principal ---
+
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow) {
+    // Inicializar GDI+
+    if (!InicializarGDIPlus()) {
+        MessageBox(NULL, L"No se pudo inicializar GDI+", L"Error", MB_ICONERROR);
+        return 1;
+    }
+
+    // Cargar imagen (coloca la ruta correcta de una imagen PNG/JPG en tu PC)
+    if (!CargarImagen(L"imagen.png")) {
+        MessageBox(NULL, L"No se pudo cargar la imagen. Asegurate que 'imagen.png' exista en la carpeta del ejecutable.", L"Error", MB_ICONERROR);
+        FinalizarGDIPlus();
+        return 1;
+    }
+
+    // Crear ventana para mostrar la imagen
+    if (!CrearVentana(hInstance, nCmdShow)) {
+        FinalizarGDIPlus();
+        return 1;
+    }
+
+    // Ejecutar menú en consola en un hilo separado o antes/después de la ventana
+    // Para simplificar, mostramos el menú en consola antes de entrar al loop de ventana
+
     SistemaGestion sistema;
     sistema.menu();
-    return 0;
+
+    // Loop de mensajes WinAPI
+    MSG msg;
+    while (GetMessage(&msg, NULL, 0, 0)) {
+        TranslateMessage(&msg);
+        DispatchMessage(&msg);
+    }
+
+    FinalizarGDIPlus();
+    return (int)msg.wParam;
 }
