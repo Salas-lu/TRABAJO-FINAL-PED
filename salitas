@@ -1,450 +1,121 @@
 #include <iostream>
 #include <string>
-#include <limits>
+#include <vector>
+#include <cstdlib>  // Para system
 
 using namespace std;
 
-// Clase para almacenar información de imágenes médicas
+// Clase para representar una imagen médica
 class ImagenMedica {
 public:
-    int id;
+    string codigo;
+    string nombre;
     string paciente;
+    string doctor;
     string diagnostico;
-    string prioridad;
     string fecha;
-    string rutaImagen;
+    string ruta;
+
+    ImagenMedica() {}
+
+    ImagenMedica(const string& c, const string& n, const string& p,
+        const string& d, const string& diag, const string& f, const string& r)
+        : codigo(c), nombre(n), paciente(p), doctor(d), diagnostico(diag), fecha(f), ruta(r) {
+    }
+
+    void mostrarInformacion() const {
+        cout << "\n=== Informacion de la Imagen Medica ===\n";
+        cout << "Codigo: " << codigo << endl;
+        cout << "Nombre: " << nombre << endl;
+        cout << "Paciente: " << paciente << endl;
+        cout << "Doctor: " << doctor << endl;
+        cout << "Diagnóstico: " << diagnostico << endl;
+        cout << "Fecha: " << fecha << endl;
+        cout << "Ruta del archivo: " << ruta << endl;
+        cout << "=======================================\n";
+    }
 };
 
-// Nodo para la Tabla Hash (manejo de colisiones con listas enlazadas)
-class NodoHash {
-public:
-    ImagenMedica imagen;
-    NodoHash* siguiente;
-    NodoHash(ImagenMedica img) : imagen(img), siguiente(nullptr) {}
-};
-
-// Tabla Hash para búsqueda rápida por ID
+// Tabla hash simplificada usando vector
 class TablaHash {
 private:
-    int capacidad;
-    NodoHash** tabla;
-
-    int funcionHash(int id) {
-        return id % capacidad;
-    }
-
+    vector<ImagenMedica> imagenes;
 public:
-    TablaHash(int cap) : capacidad(cap) {
-        tabla = new NodoHash*[capacidad]();
+    void insertar(const ImagenMedica& img) {
+        imagenes.push_back(img);
+        cout << "\n✅ Imagen almacenada con exito.\n";
     }
 
-    ~TablaHash() {
-        for (int i = 0; i < capacidad; ++i) {
-            NodoHash* actual = tabla[i];
-            while (actual) {
-                NodoHash* temp = actual;
-                actual = actual->siguiente;
-                delete temp;
+    ImagenMedica* buscar(const string& codigo) {
+        for (auto& img : imagenes) {
+            if (img.codigo == codigo) {
+                return &img;
             }
-        }
-        delete[] tabla;
-    }
-
-    void insertar(ImagenMedica img) {
-        int indice = funcionHash(img.id);
-        NodoHash* nuevoNodo = new NodoHash(img);
-        nuevoNodo->siguiente = tabla[indice];
-        tabla[indice] = nuevoNodo;
-    }
-
-    ImagenMedica* buscar(int id) {
-        int indice = funcionHash(id);
-        NodoHash* actual = tabla[indice];
-        while (actual) {
-            if (actual->imagen.id == id) {
-                return &(actual->imagen);
-            }
-            actual = actual->siguiente;
         }
         return nullptr;
     }
-
-    bool eliminar(int id) {
-        int indice = funcionHash(id);
-        NodoHash* actual = tabla[indice];
-        NodoHash* previo = nullptr;
-
-        while (actual) {
-            if (actual->imagen.id == id) {
-                if (previo) {
-                    previo->siguiente = actual->siguiente;
-                } else {
-                    tabla[indice] = actual->siguiente;
-                }
-                delete actual;
-                return true;
-            }
-            previo = actual;
-            actual = actual->siguiente;
-        }
-        return false;
-    }
-
-    // Reemplazo de vector por arreglo dinámico
-    int contarImagenes() {
-        int count = 0;
-        for (int i = 0; i < capacidad; ++i) {
-            NodoHash* actual = tabla[i];
-            while (actual) {
-                count++;
-                actual = actual->siguiente;
-            }
-        }
-        return count;
-    }
-
-    ImagenMedica* obtenerTodas(int& cantidad) {
-        cantidad = contarImagenes();
-        if (cantidad == 0) return nullptr;
-
-        ImagenMedica* imagenes = new ImagenMedica[cantidad];
-        int index = 0;
-        
-        for (int i = 0; i < capacidad; ++i) {
-            NodoHash* actual = tabla[i];
-            while (actual) {
-                imagenes[index++] = actual->imagen;
-                actual = actual->siguiente;
-            }
-        }
-        
-        return imagenes;
-    }
 };
 
-// Nodo para el Árbol AVL (búsqueda por fecha)
-class NodoAVL {
-public:
-    ImagenMedica imagen;
-    NodoAVL* izquierdo;
-    NodoAVL* derecho;
-    int altura;
-
-    NodoAVL(ImagenMedica img) : imagen(img), izquierdo(nullptr), derecho(nullptr), altura(1) {}
-};
-
-// Árbol AVL para búsqueda eficiente por fecha
-class ArbolAVL {
-private:
-    NodoAVL* raiz;
-
-    int altura(NodoAVL* nodo) {
-        return nodo ? nodo->altura : 0;
-    }
-
-    int max(int a, int b) {
-        return (a > b) ? a : b;
-    }
-
-    NodoAVL* rotarDerecha(NodoAVL* y) {
-        NodoAVL* x = y->izquierdo;
-        NodoAVL* T2 = x->derecho;
-
-        x->derecho = y;
-        y->izquierdo = T2;
-
-        y->altura = max(altura(y->izquierdo), altura(y->derecho)) + 1;
-        x->altura = max(altura(x->izquierdo), altura(x->derecho)) + 1;
-
-        return x;
-    }
-
-    NodoAVL* rotarIzquierda(NodoAVL* x) {
-        NodoAVL* y = x->derecho;
-        NodoAVL* T2 = y->izquierdo;
-
-        y->izquierdo = x;
-        x->derecho = T2;
-
-        x->altura = max(altura(x->izquierdo), altura(x->derecho)) + 1;
-        y->altura = max(altura(y->izquierdo), altura(y->derecho)) + 1;
-
-        return y;
-    }
-
-    int obtenerBalance(NodoAVL* nodo) {
-        return nodo ? altura(nodo->izquierdo) - altura(nodo->derecho) : 0;
-    }
-
-    NodoAVL* insertar(NodoAVL* nodo, ImagenMedica img) {
-        if (!nodo) return new NodoAVL(img);
-
-        if (img.fecha < nodo->imagen.fecha)
-            nodo->izquierdo = insertar(nodo->izquierdo, img);
-        else if (img.fecha > nodo->imagen.fecha)
-            nodo->derecho = insertar(nodo->derecho, img);
-        else
-            return nodo;
-
-        nodo->altura = 1 + max(altura(nodo->izquierdo), altura(nodo->derecho));
-
-        int balance = obtenerBalance(nodo);
-
-        if (balance > 1 && img.fecha < nodo->izquierdo->imagen.fecha)
-            return rotarDerecha(nodo);
-
-        if (balance < -1 && img.fecha > nodo->derecho->imagen.fecha)
-            return rotarIzquierda(nodo);
-
-        if (balance > 1 && img.fecha > nodo->izquierdo->imagen.fecha) {
-            nodo->izquierdo = rotarIzquierda(nodo->izquierdo);
-            return rotarDerecha(nodo);
-        }
-
-        if (balance < -1 && img.fecha < nodo->derecho->imagen.fecha) {
-            nodo->derecho = rotarDerecha(nodo->derecho);
-            return rotarIzquierda(nodo);
-        }
-
-        return nodo;
-    }
-
-    void inOrden(NodoAVL* nodo, ImagenMedica* arr, int& index) {
-        if (nodo) {
-            inOrden(nodo->izquierdo, arr, index);
-            arr[index++] = nodo->imagen;
-            inOrden(nodo->derecho, arr, index);
-        }
-    }
-
-    int contarNodos(NodoAVL* nodo) {
-        if (!nodo) return 0;
-        return 1 + contarNodos(nodo->izquierdo) + contarNodos(nodo->derecho);
-    }
-
-public:
-    ArbolAVL() : raiz(nullptr) {}
-
-    void insertar(ImagenMedica img) {
-        raiz = insertar(raiz, img);
-    }
-
-    int contarImagenes() {
-        return contarNodos(raiz);
-    }
-
-    ImagenMedica* obtenerPorFecha(int& cantidad) {
-        cantidad = contarNodos(raiz);
-        if (cantidad == 0) return nullptr;
-
-        ImagenMedica* imagenes = new ImagenMedica[cantidad];
-        int index = 0;
-        inOrden(raiz, imagenes, index);
-        return imagenes;
-    }
-};
-
-// Función para limpiar la pantalla de forma portable
-void limpiarPantalla() {
-    #ifdef _WIN32
-        system("cls");
-    #else
-        system("clear");
-    #endif
-}
-
-// Función para pausar la ejecución
-void pausar() {
-    cout << "\nPresione Enter para continuar...";
-    cin.ignore(numeric_limits<streamsize>::max(), '\n');
-    cin.get();
-}
-
-// Función para mostrar el menú principal
-void mostrarMenu() {
-    limpiarPantalla();
-    cout << "=== SISTEMA DE GESTION DE IMAGENES MEDICAS ===\n";
-    cout << "1. Agregar nueva imagen medica\n";
-    cout << "2. Buscar imagen por ID\n";
-    cout << "3. Mostrar todas las imagenes\n";
-    cout << "4. Mostrar imagenes ordenadas por fecha\n";
-    cout << "5. Eliminar imagen\n";
-    cout << "6. Visualizar imagen\n";
-    cout << "7. Salir\n";
-    cout << "Seleccione una opcion: ";
-}
-
-// Función para mostrar los detalles de una imagen
-void mostrarImagen(const ImagenMedica& img) {
-    cout << "\n=== DETALLES DE LA IMAGEN ===\n";
-    cout << "ID: " << img.id << "\n";
-    cout << "Paciente: " << img.paciente << "\n";
-    cout << "Diagnostico: " << img.diagnostico << "\n";
-    cout << "Prioridad: " << img.prioridad << "\n";
-    cout << "Fecha: " << img.fecha << "\n";
-    cout << "Ruta de la imagen: " << img.rutaImagen << "\n";
-}
-
-// Función para visualizar una imagen (simulación)
-void visualizarImagen(const string& ruta) {
-    cout << "\n=== VISUALIZACION DE IMAGEN ===\n";
-    cout << "[Simulacion] Mostrando imagen desde: " << ruta << "\n";
-    cout << "Imagen medica mostrada en pantalla...\n";
+// Función para abrir imagen con el visor de Windows
+void abrirImagen(const string& ruta) {
+    string comando = "start \"\" \"" + ruta + "\"";
+    system(comando.c_str());
 }
 
 int main() {
-    TablaHash tabla(100);
-    ArbolAVL arbol;
-    int opcion, id;
-    string entrada;
+    TablaHash tabla;
+    int opcion;
 
     do {
-        mostrarMenu();
+        cout << "\n--- Sistema de Gestion de Imagenes Medicas ---\n";
+        cout << "1. Ingresar nueva imagen\n";
+        cout << "2. Buscar imagen por codigo y mostrar informacion\n";
+        cout << "0. Salir\n";
+        cout << "Seleccione una opcion: ";
         cin >> opcion;
-        cin.ignore();  // Limpiar el buffer de entrada
+        cin.ignore();  // limpiar salto de línea
 
-        switch (opcion) {
-            case 1: {  // Agregar nueva imagen
-                limpiarPantalla();
-                cout << "=== NUEVA IMAGEN MEDICA ===\n";
-                
-                ImagenMedica nueva;
-                
-                cout << "ID: ";
-                cin >> nueva.id;
-                cin.ignore();
-                
-                cout << "Nombre del paciente: ";
-                getline(cin, nueva.paciente);
-                
-                cout << "Diagnostico: ";
-                getline(cin, nueva.diagnostico);
-                
-                cout << "Prioridad (Urgente/Alta/Media/Baja): ";
-                getline(cin, nueva.prioridad);
-                
-                cout << "Fecha (YYYY-MM-DD): ";
-                getline(cin, nueva.fecha);
-                
-                cout << "Ruta de la imagen: ";
-                getline(cin, nueva.rutaImagen);
-                
-                tabla.insertar(nueva);
-                arbol.insertar(nueva);
-                
-                cout << "\nImagen medica agregada con exito!\n";
-                pausar();
-                break;
-            }
-            
-            case 2: {  // Buscar por ID
-                limpiarPantalla();
-                cout << "=== BUSCAR IMAGEN POR ID ===\n";
-                cout << "Ingrese el ID a buscar: ";
-                cin >> id;
-                
-                ImagenMedica* resultado = tabla.buscar(id);
-                if (resultado) {
-                    mostrarImagen(*resultado);
-                    
-                    cout << "\nDesea visualizar esta imagen? (s/n): ";
-                    char op;
-                    cin >> op;
-                    if (op == 's' || op == 'S') {
-                        visualizarImagen(resultado->rutaImagen);
-                    }
-                } else {
-                    cout << "\nNo se encontro ninguna imagen con el ID " << id << "\n";
-                }
-                
-                pausar();
-                break;
-            }
-            
-            case 3: {  // Mostrar todas las imágenes
-                limpiarPantalla();
-                cout << "=== TODAS LAS IMAGENES ===\n";
-                
-                int cantidad;
-                ImagenMedica* imagenes = tabla.obtenerTodas(cantidad);
-                
-                if (cantidad == 0) {
-                    cout << "No hay imagenes registradas.\n";
-                } else {
-                    for (int i = 0; i < cantidad; i++) {
-                        mostrarImagen(imagenes[i]);
-                        cout << "------------------------\n";
-                    }
-                    delete[] imagenes;  // Liberar memoria
-                }
-                
-                pausar();
-                break;
-            }
-            
-            case 4: {  // Mostrar ordenadas por fecha
-                limpiarPantalla();
-                cout << "=== IMAGENES ORDENADAS POR FECHA ===\n";
-                
-                int cantidad;
-                ImagenMedica* imagenes = arbol.obtenerPorFecha(cantidad);
-                
-                if (cantidad == 0) {
-                    cout << "No hay imagenes registradas.\n";
-                } else {
-                    for (int i = 0; i < cantidad; i++) {
-                        mostrarImagen(imagenes[i]);
-                        cout << "------------------------\n";
-                    }
-                    delete[] imagenes;  // Liberar memoria
-                }
-                
-                pausar();
-                break;
-            }
-            
-            case 5: {  // Eliminar imagen
-                limpiarPantalla();
-                cout << "=== ELIMINAR IMAGEN ===\n";
-                cout << "Ingrese el ID de la imagen a eliminar: ";
-                cin >> id;
-                
-                if (tabla.eliminar(id)) {
-                    cout << "Imagen eliminada con exito.\n";
-                } else {
-                    cout << "No se encontro ninguna imagen con el ID " << id << "\n";
-                }
-                
-                pausar();
-                break;
-            }
-            
-            case 6: {  // Visualizar imagen
-                limpiarPantalla();
-                cout << "=== VISUALIZAR IMAGEN ===\n";
-                cout << "Ingrese el ID de la imagen a visualizar: ";
-                cin >> id;
-                
-                ImagenMedica* resultado = tabla.buscar(id);
-                if (resultado) {
-                    visualizarImagen(resultado->rutaImagen);
-                } else {
-                    cout << "\nNo se encontro ninguna imagen con el ID " << id << "\n";
-                }
-                
-                pausar();
-                break;
-            }
-            
-            case 7:  // Salir
-                cout << "Saliendo del sistema...\n";
-                break;
-                
-            default:
-                cout << "Opcion no valida. Intente nuevamente.\n";
-                pausar();
+        if (opcion == 1) {
+            string codigo, nombre, paciente, doctor, diagnostico, fecha, ruta;
+
+            cout << "Codigo: ";
+            getline(cin, codigo);
+            cout << "Nombre de la imagen: ";
+            getline(cin, nombre);
+            cout << "Nombre del paciente: ";
+            getline(cin, paciente);
+            cout << "Nombre del doctor: ";
+            getline(cin, doctor);
+            cout << "Diagnostico: ";
+            getline(cin, diagnostico);
+            cout << "Fecha (YYYY-MM-DD): ";
+            getline(cin, fecha);
+            cout << "Ruta completa de la imagen (ej: C:\\\\Users\\\\Usuario\\\\imagen.jpg): ";
+            getline(cin, ruta);
+
+            ImagenMedica nueva(codigo, nombre, paciente, doctor, diagnostico, fecha, ruta);
+            tabla.insertar(nueva);
+
         }
-    } while (opcion != 7);
+        else if (opcion == 2) {
+            string codigo;
+            cout << "Ingrese el codigo de la imagen: ";
+            getline(cin, codigo);
 
+            ImagenMedica* encontrada = tabla.buscar(codigo);
+            if (encontrada) {
+                encontrada->mostrarInformacion();
+                cout << "🔍 Abriendo imagen...\n";
+                abrirImagen(encontrada->ruta);
+            }
+            else {
+                cout << "❌ Imagen no encontrada.\n";
+            }
+        }
+
+    } while (opcion != 0);
+
+    cout << "\nSaliendo del sistema. Presiona Enter para finalizar...";
+    cin.get();
     return 0;
 }
